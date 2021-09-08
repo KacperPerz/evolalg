@@ -59,6 +59,7 @@ class MultiExperiment:
     def run(self, num_generations):
         flag = 1
         for i in range(self.generation + 1, num_generations + 1):
+            print("GENERATION N.", i)
             start_time = time.time()
             self.generation = i
 
@@ -74,10 +75,15 @@ class MultiExperiment:
             # operations on each subpopulation
             self.subpopulations = [self.step(subp) for subp in self.subpopulations]  # TODO decrease number of generated individuals in class StableGeneration
 
+            # statistics for each subpopulation
+            for subp in self.subpopulations:
+                self.generation_modification(subp)
+
             # merging subpopulations
             # statistics for merged population
             if i % self.when_merge == 0 or i == num_generations:
                 self.population = np.array(self.subpopulations).ravel() # TODO create counter indicating when subpopulations should be merged
+                print("STATISTICS FOR MERGED POPULATION")
                 self.population = self.generation_modification(self.population) # TODO statistics for each subpopulation and for merged population
 
             self.running_time += time.time() - start_time
