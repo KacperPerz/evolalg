@@ -19,12 +19,13 @@ class MultiExperiment:
                  generation_modification: List[Union[Callable, Step]],
                  end_steps: List[Union[Callable, Step]],
                  population_size,
+                 when_merge,
                  checkpoint_path=None, checkpoint_interval=None):
 
         self.init_population = init_population
         self.running_time = 0
         self.step = StableGeneration(
-            selection=selection, #TODO use convection or stick with tournament?
+            selection=selection,
             steps=new_generation_steps,
             population_size=population_size)
         self.generation_modification = UnionStep(generation_modification)
@@ -35,6 +36,8 @@ class MultiExperiment:
         self.checkpoint_interval = checkpoint_interval
         self.generation = 0
         self.population = None
+        self.subpopulations = None
+        self.when_merge = when_merge
 
     def init(self):
         self.generation = 0
@@ -49,20 +52,33 @@ class MultiExperiment:
         for s in self.init_population:
             self.population = s(self.population)
 
-    def sub_the_population(self): #TODO add an option to choose which criterion of splitting is used
+    def sub_the_population(self):  # TODO add an option to choose which criterion of splitting is used
         population = sorted(self.population, key=lambda x: getattr(x, "fitness"))
-        return np.array_split(population, 5) #TODO add non-static parameter for the number of divisions
+        return np.array_split(population, 5)  # TODO add non-static parameter for the number of divisions
 
     def run(self, num_generations):
+        flag = 1
         for i in range(self.generation + 1, num_generations + 1):
             start_time = time.time()
-            subpopulations = self.sub_the_population()
             self.generation = i
 
-            res = [self.step(subp) for subp in subpopulations] #TODO decrease number of generated individuals in class StableGeneration
+            # periodic splitting
+            if flag != 1 and i % (self.when_merge + 1) == 0:
+                self.subpopulations = self.sub_the_population()
 
-            self.population = np.array(res).ravel() #TODO create counter indicating when subpopulations should be merged
-            self.population = self.generation_modification(self.population)
+            # initial splitting (executed once)
+            if flag == 1:
+                self.subpopulations = self.sub_the_population()
+                flag = 0
+
+            # operations on each subpopulation
+            self.subpopulations = [self.step(subp) for subp in self.subpopulations]  # TODO decrease number of generated individuals in class StableGeneration
+
+            # merging subpopulations
+            # statistics for merged population
+            if i % self.when_merge == 0 or i == num_generations:
+                self.population = np.array(self.subpopulations).ravel() # TODO create counter indicating when subpopulations should be merged
+                self.population = self.generation_modification(self.population) # TODO statistics for each subpopulation and for merged population
 
             self.running_time += time.time() - start_time
             if (self.checkpoint_path is not None
