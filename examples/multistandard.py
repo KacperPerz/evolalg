@@ -118,7 +118,8 @@ def main():
                             new_generation_steps=new_generation_steps,
                             generation_modification=generation_modifications,
                             end_steps=end_steps,
-                            population_size=parsed_args.popsize
+                            population_size=parsed_args.popsize,
+                            when_merge=3
                             )
     experiment.init()
     experiment.run(parsed_args.generations)
