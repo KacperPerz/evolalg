@@ -82,9 +82,9 @@ class MultiExperiment:
             # merging subpopulations
             # statistics for merged population
             if i % self.when_merge == 0 or i == num_generations:
-                self.population = np.array(self.subpopulations).ravel() # TODO create counter indicating when subpopulations should be merged
+                self.population = np.array(self.subpopulations).ravel()
                 print("STATISTICS FOR MERGED POPULATION")
-                self.population = self.generation_modification(self.population) # TODO statistics for each subpopulation and for merged population
+                self.population = self.generation_modification(self.population)
 
             self.running_time += time.time() - start_time
             if (self.checkpoint_path is not None
