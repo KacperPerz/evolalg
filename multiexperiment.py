@@ -1,5 +1,7 @@
+import copy
 import os
 from typing import List, Callable, Union
+from random import randrange
 
 import numpy as np
 
@@ -11,6 +13,7 @@ from evolalg.base.union_step import UnionStep
 from evolalg.selection.selection import Selection
 from evolalg.utils.stable_generation import StableGeneration
 import logging
+
 
 class MultiExperiment:
     def __init__(self, init_population: List[Callable],
@@ -52,9 +55,20 @@ class MultiExperiment:
         for s in self.init_population:
             self.population = s(self.population)
 
-    def sub_the_population(self):  # TODO add an option to choose which criterion of splitting is used
-        population = sorted(self.population, key=lambda x: getattr(x, "fitness"))
-        return np.array_split(population, 5)  # TODO add non-static parameter for the number of divisions
+    def sub_the_population(self, splitting_method, num_groups):
+        if splitting_method == "a":
+            population = sorted(self.population, key=lambda x: getattr(x, "fitness"))
+            return np.array_split(population, num_groups)
+
+        if splitting_method == "random_allocation":
+            temp_population = copy.deepcopy(self.population)
+            res = []
+            number_of_elements = len(temp_population) // num_groups
+
+            for i in range(num_groups):
+                elems = [temp_population.pop(randrange(len(temp_population))) for _ in range(number_of_elements)]
+                res.append(elems)
+            return res
 
     def run(self, num_generations):
         flag = 1
@@ -65,15 +79,15 @@ class MultiExperiment:
 
             # periodic splitting
             if flag != 1 and i % (self.when_merge + 1) == 0:
-                self.subpopulations = self.sub_the_population()
+                self.subpopulations = self.sub_the_population("random_allocation", 5)
 
             # initial splitting (executed once)
             if flag == 1:
-                self.subpopulations = self.sub_the_population()
+                self.subpopulations = self.sub_the_population("random_allocation", 5)
                 flag = 0
 
             # operations on each subpopulation
-            self.subpopulations = [self.step(subp) for subp in self.subpopulations]  # TODO decrease number of generated individuals in class StableGeneration
+            self.subpopulations = [self.step(subp) for subp in self.subpopulations]
 
             # statistics for each subpopulation
             for subp in self.subpopulations:
@@ -82,7 +96,7 @@ class MultiExperiment:
             # merging subpopulations
             # statistics for merged population
             if i % self.when_merge == 0 or i == num_generations:
-                self.population = np.array(self.subpopulations).ravel()
+                self.population = [ind for subp in self.subpopulations for ind in subp]  # stick with numpy ravel() ?
                 print("STATISTICS FOR MERGED POPULATION")
                 self.population = self.generation_modification(self.population)
 
