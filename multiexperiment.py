@@ -70,6 +70,27 @@ class MultiExperiment:
                 res.append(elems)
             return res
 
+        if splitting_method == "equal_width_allocation":
+            best = max(self.population, key=lambda x: getattr(x, "fitness"))
+            worst = min(self.population, key=lambda x: getattr(x, "fitness"))
+            res = []
+            temp_population = copy.deepcopy(self.population)
+            for i in range(num_groups):
+                elems = []
+                mini = getattr(worst, "fitness") + getattr(best, "fitness") - getattr(worst, "fitness") * i / num_groups
+                maxi = getattr(worst, "fitness") + (getattr(best, "fitness") - getattr(worst, "fitness")) * (i+1) / num_groups
+
+                for j in range(len(temp_population)):
+                    if mini <= getattr(temp_population[j], "fitness") <= maxi:
+                        elems.append(temp_population[j])
+                if len(elems) == 0:
+                    if i == 0:
+                        elems.append(worst)
+                    else:
+                        elems = res[len(res) - 1]
+                res.append(elems)
+            return res
+
     def run(self, num_generations):
         flag = 1
         for i in range(self.generation + 1, num_generations + 1):
@@ -87,7 +108,7 @@ class MultiExperiment:
                 flag = 0
 
             # operations on each subpopulation
-            self.subpopulations = [self.step(subp) for subp in self.subpopulations]
+            self.subpopulations = [self.step(subp) for subp in self.subpopulations if len(subp) != 0]
 
             # statistics for each subpopulation
             for subp in self.subpopulations:
