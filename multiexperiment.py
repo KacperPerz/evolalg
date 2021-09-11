@@ -108,7 +108,7 @@ class MultiExperiment:
                 flag = 0
 
             # operations on each subpopulation
-            self.subpopulations = [self.step(subp) for subp in self.subpopulations if len(subp) != 0]
+            self.subpopulations = [self.step(subp) for subp in self.subpopulations]
 
             # statistics for each subpopulation
             for subp in self.subpopulations:
