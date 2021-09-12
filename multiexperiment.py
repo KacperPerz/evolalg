@@ -73,22 +73,28 @@ class MultiExperiment:
         if splitting_method == "equal_width_allocation":
             best = max(self.population, key=lambda x: getattr(x, "fitness"))
             worst = min(self.population, key=lambda x: getattr(x, "fitness"))
+            remember_the_best = -1
+            remember_the_worst = -1
             res = []
             temp_population = copy.deepcopy(self.population)
             for i in range(num_groups):
                 elems = []
-                mini = getattr(worst, "fitness") + getattr(best, "fitness") - getattr(worst, "fitness") * i / num_groups
+                mini = getattr(worst, "fitness") + (getattr(best, "fitness") - getattr(worst, "fitness")) * i / num_groups
                 maxi = getattr(worst, "fitness") + (getattr(best, "fitness") - getattr(worst, "fitness")) * (i+1) / num_groups
 
-                for j in range(len(temp_population)):
-                    if mini <= getattr(temp_population[j], "fitness") <= maxi:
-                        elems.append(temp_population[j])
-                if len(elems) == 0:
+                if remember_the_best != maxi and remember_the_worst != mini:
+                    for j in range(len(temp_population)):
+                        if mini <= getattr(temp_population[j], "fitness") <= maxi:
+                            elems.append(temp_population[j])
+                remember_the_worst = mini
+                remember_the_best = maxi
+                """if len(elems) == 0:
                     if i == 0:
                         elems.append(worst)
                     else:
-                        elems = res[len(res) - 1]
-                res.append(elems)
+                        elems = res[len(res) - 1]"""
+                if len(elems) != 0:
+                    res.append(elems)
             return res
 
     def run(self, num_generations):
@@ -99,12 +105,12 @@ class MultiExperiment:
             self.generation = i
 
             # periodic splitting
-            if flag != 1 and i % (self.when_merge + 1) == 0:
-                self.subpopulations = self.sub_the_population("random_allocation", 5)
+            if flag != 1 and (i % self.when_merge) - 1 == 0:
+                self.subpopulations = self.sub_the_population("equal_width_allocation", 5)
 
             # initial splitting (executed once)
             if flag == 1:
-                self.subpopulations = self.sub_the_population("random_allocation", 5)
+                self.subpopulations = self.sub_the_population("equal_width_allocation", 5)
                 flag = 0
 
             # operations on each subpopulation
@@ -117,7 +123,7 @@ class MultiExperiment:
             # merging subpopulations
             # statistics for merged population
             if i % self.when_merge == 0 or i == num_generations:
-                self.population = [ind for subp in self.subpopulations for ind in subp]  # stick with numpy ravel() ?
+                self.population = [ind for subp in self.subpopulations for ind in subp]
                 print("STATISTICS FOR MERGED POPULATION")
                 self.population = self.generation_modification(self.population)
 
