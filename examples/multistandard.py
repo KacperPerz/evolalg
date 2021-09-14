@@ -47,8 +47,11 @@ def parseArguments():
                         help='Genetic format for the demo run, for example 4, 9, or B. If not given, f1 is assumed.')
     parser.add_argument('-sim', required=False, default="eval-allcriteria.sim", help="Name of the .sim file with all parameter values")
     parser.add_argument("-popsize", type=int, default=50, help="Population size, default 50.")
-    parser.add_argument('-generations', type=int, default=5, help="Number of generations, default 5.")
+    parser.add_argument('-generations', type=int, default=15, help="Number of generations, default 5.")
     parser.add_argument('-tournament', type=int, default=5, help="Tournament size, default 5.")
+    parser.add_argument('-whenmerge', type=int, default=5, help="Number of evaluations between merging subpopulations")
+    parser.add_argument('-subpopnum', type=int, default=5, help="Number of subpopulations")
+    parser.add_argument('-splitmethod', type=str, default="ena", help="ena: equalNumberAllocation, ewa: equalWidthAllocation, era: equalRandomAllocation")
 
     parser.add_argument('-hof_size', type=int, default=10, help="Number of genotypes in Hall of Fame. Default: 10.")
     return parser.parse_args()
@@ -94,7 +97,7 @@ def main():
     )
 
     selection = TournamentSelection(parsed_args.tournament, copy=True, fit_attr="fitness")
-    new_generation_steps = [ #CZY TU TRZEBA ŁĄCZYĆ POPULACJE?
+    new_generation_steps = [
         FramsCrossAndMutate(frams_lib, cross_prob=0.2, mutate_prob=0.9),
         fitness_remove
     ]
@@ -119,7 +122,9 @@ def main():
                             generation_modification=generation_modifications,
                             end_steps=end_steps,
                             population_size=parsed_args.popsize,
-                            when_merge=3
+                            when_merge=parsed_args.whenmerge,
+                            subpop_num=parsed_args.subpopnum,
+                            split_method=parsed_args.splitmethod
                             )
     experiment.init()
     experiment.run(parsed_args.generations)
