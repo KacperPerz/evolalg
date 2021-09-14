@@ -1,5 +1,6 @@
 import copy
 import os
+import random
 from typing import List, Callable, Union
 from random import randrange
 
@@ -23,6 +24,8 @@ class MultiExperiment:
                  end_steps: List[Union[Callable, Step]],
                  population_size,
                  when_merge,
+                 subpop_num,
+                 split_method,
                  checkpoint_path=None, checkpoint_interval=None):
 
         self.init_population = init_population
@@ -41,6 +44,8 @@ class MultiExperiment:
         self.population = None
         self.subpopulations = None
         self.when_merge = when_merge
+        self.split_method = split_method
+        self.subpop_num = subpop_num
 
     def init(self):
         self.generation = 0
@@ -56,11 +61,11 @@ class MultiExperiment:
             self.population = s(self.population)
 
     def sub_the_population(self, splitting_method, num_groups):
-        if splitting_method == "a":
+        if splitting_method == "ena":
             population = sorted(self.population, key=lambda x: getattr(x, "fitness"))
             return np.array_split(population, num_groups)
 
-        if splitting_method == "random_allocation":
+        if splitting_method == "era":
             temp_population = copy.deepcopy(self.population)
             res = []
             number_of_elements = len(temp_population) // num_groups
@@ -70,30 +75,30 @@ class MultiExperiment:
                 res.append(elems)
             return res
 
-        if splitting_method == "equal_width_allocation":
+        if splitting_method == "ewa":
             best = max(self.population, key=lambda x: getattr(x, "fitness"))
             worst = min(self.population, key=lambda x: getattr(x, "fitness"))
-            remember_the_best = -1
-            remember_the_worst = -1
             res = []
             temp_population = copy.deepcopy(self.population)
+            how_many_ind = len(temp_population) // num_groups
             for i in range(num_groups):
                 elems = []
                 mini = getattr(worst, "fitness") + (getattr(best, "fitness") - getattr(worst, "fitness")) * i / num_groups
                 maxi = getattr(worst, "fitness") + (getattr(best, "fitness") - getattr(worst, "fitness")) * (i+1) / num_groups
 
-                if remember_the_best != maxi and remember_the_worst != mini:
+                if worst is not best:
                     for j in range(len(temp_population)):
                         if mini <= getattr(temp_population[j], "fitness") <= maxi:
                             elems.append(temp_population[j])
-                remember_the_worst = mini
-                remember_the_best = maxi
-                """if len(elems) == 0:
-                    if i == 0:
-                        elems.append(worst)
-                    else:
-                        elems = res[len(res) - 1]"""
-                if len(elems) != 0:
+                    if len(elems) > how_many_ind:
+                        elems = elems[:how_many_ind]
+                    if len(elems) == 0:
+                        elems.append(random.choice(temp_population))
+                    while len(elems) < how_many_ind:
+                        elems.append(random.choice(elems))
+                    res.append(elems)
+                else:
+                    elems = [temp_population[j*(i+1)] for j in range(how_many_ind)]
                     res.append(elems)
             return res
 
@@ -106,11 +111,11 @@ class MultiExperiment:
 
             # periodic splitting
             if flag != 1 and (i % self.when_merge) - 1 == 0:
-                self.subpopulations = self.sub_the_population("equal_width_allocation", 5)
+                self.subpopulations = self.sub_the_population(self.split_method, self.subpop_num)
 
             # initial splitting (executed once)
             if flag == 1:
-                self.subpopulations = self.sub_the_population("equal_width_allocation", 5)
+                self.subpopulations = self.sub_the_population(self.split_method, self.subpop_num)
                 flag = 0
 
             # operations on each subpopulation
