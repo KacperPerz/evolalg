@@ -78,29 +78,30 @@ class MultiExperiment:
         if splitting_method == "ewa":
             best = max(self.population, key=lambda x: getattr(x, "fitness"))
             worst = min(self.population, key=lambda x: getattr(x, "fitness"))
+
+            intervals = np.linspace(getattr(worst, "fitness"), getattr(best, "fitness"), num_groups+1) #TODO omowic inny sposob
             res = []
             temp_population = copy.deepcopy(self.population)
             how_many_ind = len(temp_population) // num_groups
-            for i in range(num_groups):
-                elems = []
-                mini = getattr(worst, "fitness") + (getattr(best, "fitness") - getattr(worst, "fitness")) * i / num_groups
-                maxi = getattr(worst, "fitness") + (getattr(best, "fitness") - getattr(worst, "fitness")) * (i+1) / num_groups
 
-                if worst is not best:
-                    for j in range(len(temp_population)):
-                        if mini <= getattr(temp_population[j], "fitness") <= maxi:
-                            elems.append(temp_population[j])
-                    if len(elems) > how_many_ind:
-                        elems = elems[:how_many_ind]
-                    if len(elems) == 0:
-                        elems.append(random.choice(temp_population))
-                    while len(elems) < how_many_ind:
-                        elems.append(random.choice(elems))
-                    res.append(elems)
-                else:
-                    elems = [temp_population[j*(i+1)] for j in range(how_many_ind)]
-                    res.append(elems)
+            elems = []
+            for individual in temp_population:
+                if intervals[0] >= getattr(individual, "fitness") <= intervals[1]:
+                    elems.append(individual)
+            res.append(elems)
+
+            for i in range(1, len(intervals[:-1])):
+                elems = []
+                for individual in temp_population:
+                    if intervals[i] > getattr(individual, "fitness") <= intervals[i+1]:
+                        elems.append(individual)
+                if len(elems) == 0:
+                    elems = res[i-1]
+                res.append(elems)
+
             return res
+
+
 
     def run(self, num_generations):
         flag = 1
@@ -140,6 +141,8 @@ class MultiExperiment:
 
         self.population = self.end_steps(self.population)
 
+        #self.check_checkpoint()
+
     def save_checkpoint(self):
         tmp_filepath = self.checkpoint_path+"_tmp"
         try:
@@ -149,7 +152,12 @@ class MultiExperiment:
         except Exception as ex:
             raise RuntimeError("Failed to save checkpoint '%s' (because: %s). This does not prevent the experiment from continuing, but let's stop here to fix the problem with saving checkpoints." % (tmp_filepath, ex))
 
-
+    #def check_checkpoint(self):
+    #    with open('C:\\framsticks\\library\\framspy\\checkpoints', 'rb') as f:
+    #        data = pickle.load(f)
+    #        with open('foo.txt', 'w') as r:
+    #
+    #        print(data)
     @staticmethod
     def restore(path):
         with open(path) as file:
