@@ -61,10 +61,12 @@ class MultiExperiment:
             self.population = s(self.population)
 
     def sub_the_population(self, splitting_method, num_groups):
+        # equal number allocation
         if splitting_method == "ena":
             population = sorted(self.population, key=lambda x: getattr(x, "fitness"))
             return np.array_split(population, num_groups)
 
+        # equal range allocation
         if splitting_method == "era":
             temp_population = copy.deepcopy(self.population)
             res = []
@@ -75,32 +77,38 @@ class MultiExperiment:
                 res.append(elems)
             return res
 
+        # equal width allocation
         if splitting_method == "ewa":
             best = max(self.population, key=lambda x: getattr(x, "fitness"))
             worst = min(self.population, key=lambda x: getattr(x, "fitness"))
 
-            intervals = np.linspace(getattr(worst, "fitness"), getattr(best, "fitness"), num_groups+1)
-            res = []
+            intervals = np.linspace(getattr(worst, "fitness"), getattr(best, "fitness"), num_groups + 1)
             temp_population = copy.deepcopy(self.population)
-
+            res = []
             elems = []
+
+            # It's worth to notice that the same result can be reached through popping individuals from
+            # temp_population after they are added to elems list. With current approach the complexity is O(n^2).
+
+            # [0 ; x] (x ; 2x] ... ((n-1)x ; nx] - the pattern of dividing fitness into intervals.
+            # The first interval is closed from right and left to ensure that the first subpopulation
+            # will never be empty. Each subsequent interval is closed from left to ensure that
+            # the last interval never will lose the best solution.
             for individual in temp_population:
-                if intervals[0] >= getattr(individual, "fitness") <= intervals[1]:
+                if intervals[0] <= getattr(individual, "fitness") <= intervals[1]:
                     elems.append(individual)
             res.append(elems)
 
             for i in range(1, len(intervals[:-1])):
                 elems = []
                 for individual in temp_population:
-                    if intervals[i] > getattr(individual, "fitness") <= intervals[i+1]:
+                    if intervals[i] < getattr(individual, "fitness") <= intervals[i + 1]:
                         elems.append(individual)
                 if len(elems) == 0:
-                    elems = res[i-1]
+                    elems = res[i - 1]
                 res.append(elems)
 
             return res
-
-
 
     def run(self, num_generations):
         flag = 1
@@ -146,18 +154,21 @@ class MultiExperiment:
 
         self.population = self.end_steps(self.population)
 
-        #self.check_checkpoint()
+        # self.check_checkpoint()
 
     def save_checkpoint(self):
-        tmp_filepath = self.checkpoint_path+"_tmp"
+        tmp_filepath = self.checkpoint_path + "_tmp"
         try:
             with open(tmp_filepath, "wb") as file:
                 pickle.dump(self, file)
-            os.replace(tmp_filepath, self.checkpoint_path)  # ensures the new file was first saved OK (e.g. enough free space on device), then replace
+            os.replace(tmp_filepath,
+                       self.checkpoint_path)  # ensures the new file was first saved OK (e.g. enough free space on device), then replace
         except Exception as ex:
-            raise RuntimeError("Failed to save checkpoint '%s' (because: %s). This does not prevent the experiment from continuing, but let's stop here to fix the problem with saving checkpoints." % (tmp_filepath, ex))
+            raise RuntimeError(
+                "Failed to save checkpoint '%s' (because: %s). This does not prevent the experiment from continuing, but let's stop here to fix the problem with saving checkpoints." % (
+                tmp_filepath, ex))
 
-    #def check_checkpoint(self):
+    # def check_checkpoint(self):
     #    with open('C:\\framsticks\\library\\framspy\\checkpoints', 'rb') as f:
     #        data = pickle.load(f)
     #        with open('foo.txt', 'w') as r:
