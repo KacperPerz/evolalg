@@ -79,10 +79,9 @@ class MultiExperiment:
             best = max(self.population, key=lambda x: getattr(x, "fitness"))
             worst = min(self.population, key=lambda x: getattr(x, "fitness"))
 
-            intervals = np.linspace(getattr(worst, "fitness"), getattr(best, "fitness"), num_groups+1) #TODO omowic inny sposob
+            intervals = np.linspace(getattr(worst, "fitness"), getattr(best, "fitness"), num_groups+1)
             res = []
             temp_population = copy.deepcopy(self.population)
-            how_many_ind = len(temp_population) // num_groups
 
             elems = []
             for individual in temp_population:
@@ -119,9 +118,15 @@ class MultiExperiment:
                 self.subpopulations = self.sub_the_population(self.split_method, self.subpop_num)
                 flag = 0
 
+            # statistics for each subpopulation
+            print("BEFORE")
+            for subp in self.subpopulations:
+                self.generation_modification(subp)
+
             # operations on each subpopulation
             self.subpopulations = [self.step(subp) for subp in self.subpopulations]
 
+            print("AFTER")
             # statistics for each subpopulation
             for subp in self.subpopulations:
                 self.generation_modification(subp)
