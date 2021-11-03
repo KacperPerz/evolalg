@@ -33,7 +33,7 @@ class MultiExperiment:
         self.step = StableGeneration(
             selection=selection,
             steps=new_generation_steps,
-            population_size=population_size)
+            population_size=population_size//subpop_num)
         self.generation_modification = UnionStep(generation_modification)
 
         self.end_steps = UnionStep(end_steps)
@@ -112,6 +112,7 @@ class MultiExperiment:
 
     def run(self, num_generations):
         flag = 1
+
         for i in range(self.generation + 1, num_generations + 1):
             print("GENERATION N.", i)
             start_time = time.time()

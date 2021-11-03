@@ -24,7 +24,7 @@ class StableGeneration(Step):
         self.steps.init()
 
     def call(self, population):
-        population_size = None
+        population_size = self.population_size
         if population_size is None:
             population_size = len(population)
         generated = []
@@ -34,4 +34,4 @@ class StableGeneration(Step):
                 generated.extend(gen)
             else:
                 generated.append(gen)
-        return generated[:len(population)]
+        return generated[:population_size]
