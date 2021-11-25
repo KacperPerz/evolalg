@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import numpy as np
+import pickle
 
 # TODO add new example: steadystate.py (analogous to standard.py) OR include steadysteate as a mode in this example or in niching_novelty.py
 # TODO extend both standard.py and steadystate.py to support >1 criteria (using DEAP's selNSGA2() and selSPEA2())
@@ -52,6 +53,8 @@ def parseArguments():
     parser.add_argument('-whenmerge', type=int, default=5, help="Number of evaluations between merging subpopulations")
     parser.add_argument('-subpopnum', type=int, default=5, help="Number of subpopulations")
     parser.add_argument('-splitmethod', type=str, default="ena", help="ena: equalNumberAllocation, ewa: equalWidthAllocation, era: equalRandomAllocation")
+    parser.add_argument('-checkpoint_path', required=False, default=None, help="Path to the checkpoint file")
+    parser.add_argument('-checkpoint_interval', required=False, type=int, default=100, help="Checkpoint interval")
 
     parser.add_argument('-hof_size', type=int, default=10, help="Number of genotypes in Hall of Fame. Default: 10.")
     return parser.parse_args()
@@ -59,6 +62,13 @@ def parseArguments():
 
 def extract_fitness(ind):
     return ind.fitness
+
+
+def load_experiment(path):
+    with open(path, "rb") as file:
+        experiment = pickle.load(file)
+    print("Loaded experiment. Generation:", experiment.generation)
+    return experiment
 
 
 def print_population_count(pop):
@@ -69,67 +79,80 @@ def print_population_count(pop):
 def main():
     parsed_args = parseArguments()
     print(parsed_args)
-    frams_lib = FramsticksLib(parsed_args.path, parsed_args.lib, parsed_args.sim)
 
-    hall_of_fame = HallOfFameStatistics(parsed_args.hof_size, "fitness")
-    statistics_union = UnionStep([
-        hall_of_fame,
-        StatisticsDeap([
-            ("avg", np.mean),
-            ("stddev", np.std),
-            ("min", np.min),
-            ("max", np.max),
-            ("count", len)
-        ], extract_fitness)
-    ])
+    if parsed_args.checkpoint_path is not None and os.path.exists(parsed_args.checkpoint_path):
+        print("dziala")
+        experiment = load_experiment(parsed_args.checkpoint_path)
+        FramsticksLib(parsed_args.path, parsed_args.lib,
+                      parsed_args.sim)
+    else:
+        frams_lib = FramsticksLib(parsed_args.path, parsed_args.lib, parsed_args.sim)
 
-    fitness_remove = UnionStep(  # evaluate performance and fitness, rename some of the fields, and remove some performance fields that we get from Framsticks, but we don't need them here
-        [
-        FitnessStep(frams_lib, fields={"velocity": "fitness", "data->recording": "recording"},
-                    fields_defaults={"velocity": None, "data->recording": None})  # custom definitions and handling
-        if EVAL_LIFESPAN_BEHAVIOR else
-        FitnessStep(frams_lib, fields={parsed_args.opt: "fitness"}, fields_defaults={parsed_args.opt: None})
+        hall_of_fame = HallOfFameStatistics(parsed_args.hof_size, "fitness")
+        statistics_union = UnionStep([
+            hall_of_fame,
+            StatisticsDeap([
+                ("avg", np.mean),
+                ("stddev", np.std),
+                ("min", np.min),
+                ("max", np.max),
+                ("count", len)
+            ], extract_fitness)
+        ])
+
+        fitness_remove = UnionStep(
+            # evaluate performance and fitness, rename some of the fields, and remove some performance fields that we get from Framsticks, but we don't need them here
+            [
+                FitnessStep(frams_lib, fields={"velocity": "fitness", "data->recording": "recording"},
+                            fields_defaults={"velocity": None,
+                                             "data->recording": None})  # custom definitions and handling
+                if EVAL_LIFESPAN_BEHAVIOR else
+                FitnessStep(frams_lib, fields={parsed_args.opt: "fitness"}, fields_defaults={parsed_args.opt: None})
+            ]
+            +
+            ([FieldRemove("recording", None)] if EVAL_LIFESPAN_BEHAVIOR else [FieldRemove("fitness", None)])
+            +
+            [print_population_count]  # Stages can also be any Callable
+        )
+
+        selection = TournamentSelection(parsed_args.tournament, copy=True, fit_attr="fitness")
+        new_generation_steps = [
+            FramsCrossAndMutate(frams_lib, cross_prob=0.2, mutate_prob=0.9),
+            fitness_remove
         ]
-        +
-        ([FieldRemove("recording", None)] if EVAL_LIFESPAN_BEHAVIOR else [FieldRemove("fitness", None)])
-        +
-        [print_population_count]  # Stages can also be any Callable
-    )
 
-    selection = TournamentSelection(parsed_args.tournament, copy=True, fit_attr="fitness")
-    new_generation_steps = [
-        FramsCrossAndMutate(frams_lib, cross_prob=0.2, mutate_prob=0.9),
-        fitness_remove
-    ]
+        generation_modifications = [
+            statistics_union  # Or niching, novelty
+        ]
 
-    generation_modifications = [
-        statistics_union  # Or niching, novelty
-    ]
+        init_stages = [FramsPopulation(frams_lib, parsed_args.genformat, parsed_args.popsize),
+                       fitness_remove,  # It is possible to create smaller population
+                       statistics_union]
 
-    init_stages = [FramsPopulation(frams_lib, parsed_args.genformat, parsed_args.popsize),
-                   fitness_remove,  # It is possible to create smaller population
-                   statistics_union]
+        end_steps = [PopulationSave("halloffame.gen", provider=hall_of_fame.halloffame,
+                                    fields={"genotype": "genotype", "fitness": "fitness", "custom": "recording"}
+                                    if EVAL_LIFESPAN_BEHAVIOR
+                                    else {"genotype": "genotype", "fitness": "fitness"}
+                                    )]
 
-    end_steps = [PopulationSave("halloffame.gen", provider=hall_of_fame.halloffame,
-                                fields={"genotype": "genotype", "fitness": "fitness", "custom": "recording"}
-                                if EVAL_LIFESPAN_BEHAVIOR
-                                else {"genotype": "genotype", "fitness": "fitness"}
-                                )]
+        experiment = MultiExperiment(init_population=init_stages,
+                                     selection=selection,
+                                     new_generation_steps=new_generation_steps,
+                                     generation_modification=generation_modifications,
+                                     end_steps=end_steps,
+                                     population_size=parsed_args.popsize,
+                                     when_merge=parsed_args.whenmerge,
+                                     subpop_num=parsed_args.subpopnum,
+                                     split_method=parsed_args.splitmethod,
+                                     checkpoint_path=parsed_args.checkpoint_path,
+                                     checkpoint_interval=parsed_args.checkpoint_interval
+                                     )
 
-    experiment = MultiExperiment(init_population=init_stages,
-                            selection=selection,
-                            new_generation_steps=new_generation_steps,
-                            generation_modification=generation_modifications,
-                            end_steps=end_steps,
-                            population_size=parsed_args.popsize,
-                            when_merge=parsed_args.whenmerge,
-                            subpop_num=parsed_args.subpopnum,
-                            split_method=parsed_args.splitmethod
-                            )
-    experiment.init()
+        experiment.init()
+
     experiment.run(parsed_args.generations)
-    for ind in hall_of_fame.halloffame:
-        print("%g\t%s" % (ind.fitness, ind.genotype))
+    #for ind in experiment.end_steps. #experiment.hall_of_fame.halloffame:
+    #    print("%g\t%s" % (ind.fitness, ind.genotype))
 
 
 if __name__ == '__main__':
