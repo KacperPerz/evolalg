@@ -158,12 +158,12 @@ class MultiExperiment:
         # self.check_checkpoint()
 
     def save_checkpoint(self):
-        tmp_filepath = self.checkpoint_path + "_tmp"
+        tmp_filepath = self.checkpoint_path + "+pop_size=" + str(len(self.population)) + "+subpop_num=" + str(self.subpop_num) + "+when_merge=" + str(self.when_merge)
         try:
             with open(tmp_filepath, "wb") as file:
                 pickle.dump(self, file)
             os.replace(tmp_filepath,
-                       self.checkpoint_path)  # ensures the new file was first saved OK (e.g. enough free space on device), then replace
+                       tmp_filepath)  # ensures the new file was first saved OK (e.g. enough free space on device), then replace
         except Exception as ex:
             raise RuntimeError(
                 "Failed to save checkpoint '%s' (because: %s). This does not prevent the experiment from continuing, but let's stop here to fix the problem with saving checkpoints." % (

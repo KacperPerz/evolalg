@@ -81,7 +81,6 @@ def main():
     print(parsed_args)
 
     if parsed_args.checkpoint_path is not None and os.path.exists(parsed_args.checkpoint_path):
-        print("dziala")
         experiment = load_experiment(parsed_args.checkpoint_path)
         FramsticksLib(parsed_args.path, parsed_args.lib,
                       parsed_args.sim)
