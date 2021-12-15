@@ -23,6 +23,7 @@ class MultiExperiment:
                  generation_modification: List[Union[Callable, Step]],
                  end_steps: List[Union[Callable, Step]],
                  population_size,
+                 tournament_size,
                  when_merge,
                  subpop_num,
                  split_method,
@@ -42,6 +43,7 @@ class MultiExperiment:
         self.checkpoint_interval = checkpoint_interval
         self.generation = 0
         self.population = None
+        self.tournament_size = tournament_size
         self.subpopulations = None
         self.when_merge = when_merge
         self.split_method = split_method

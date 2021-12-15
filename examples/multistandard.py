@@ -142,6 +142,7 @@ def main():
                                      population_size=parsed_args.popsize,
                                      when_merge=parsed_args.whenmerge,
                                      subpop_num=parsed_args.subpopnum,
+                                     tournament_size=parsed_args.tournament,
                                      split_method=parsed_args.splitmethod,
                                      checkpoint_path=parsed_args.checkpoint_path,
                                      checkpoint_interval=parsed_args.checkpoint_interval
